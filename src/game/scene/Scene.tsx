@@ -1,6 +1,14 @@
 import Lighting from './Lighting';
 import Player from '../player/Player';
 import FollowCamera from '../camera/FollowCamera';
+import CameraEffects from '../camera/CameraEffects';
+import SlideManager from '../slide/SlideManager';
+import SlideChunk from '../slide/SlideChunk';
+import WaterParkBackground from '../environment/WaterParkBackground';
+import { useGameStore } from '@/store/gameStore';
+import { Sky } from '@react-three/drei'; // NEW: Add a skybox
+import WaterSpray from '../effects/WaterSpray';
+import BackgroundManager from '../environment/BackgroundManager';
 
 /**
  * The 3D scene. Everything inside <Canvas> lives here.
@@ -12,17 +20,42 @@ import FollowCamera from '../camera/FollowCamera';
  *   - Smooth follow camera
  */
 export default function Scene() {
+  const chunks = useGameStore((s) => s.chunks);
+
   return (
     <>
       <Lighting />
       <FollowCamera />
+      <CameraEffects /> {/* Handles FOV changes */}
 
-      <mesh rotation-x={-Math.PI / 2} position={[0, -2, 20]} receiveShadow>
-        <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial color="#0a2a3a" />
-      </mesh>
+      {/* Soft light-blue sky color instead of heavy Sky shader */}
+      <color attach="background" args={['#b3e0ff']} />
+
+      {/* 🌟 Infinite Procedural Background */}
+      <BackgroundManager />
+      
+      {/* Sky and atmosphere */}
+      <Sky 
+        sunPosition={[100, 20, 100]} 
+        turbidity={10} 
+        rayleigh={2} 
+        mieCoefficient={0.005}
+        mieDirectionalG={0.8}
+      />
+
+      {/* Background water park elements */}
+      <WaterParkBackground />
+      
+      <SlideManager />
+
+      {chunks.map((chunk) => (
+        <SlideChunk key={chunk.id} data={chunk} />
+      ))}
 
       <Player />
+      <WaterSpray /> {/* Add here */}
+
+      <fog attach="fog" args={['#87ceeb', 60, 180]} /> {/* Match sky color */}
     </>
   );
 }
