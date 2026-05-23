@@ -1,5 +1,5 @@
-import { CatmullRomCurve3, Vector3 } from 'three';
-import { SLIDE } from './constants';
+import { CatmullRomCurve3, Matrix4, Quaternion, Vector3 } from 'three';
+import { SLIDE, ENTITY } from './constants';
 import { ChunkShape } from '@/types/slide';
 
 /**
@@ -50,10 +50,12 @@ export function controlPointsForShape(shape: ChunkShape): Vector3[] {
         new Vector3(0, -2, L * 0.6),
         new Vector3(0, -3, L),
       ];
-
+    // ... (apply L to other shapes similarly)
     case ChunkShape.Fork:
-      // For Phase 1 we treat forks as straight; we'll branch later.
-      return [new Vector3(0, 0, 0), new Vector3(0, -1, L)];
+      // Fork is mostly straight but long
+      return [new Vector3(0, 0, 0), new Vector3(0, -2, L)];
+    default:
+      return [new Vector3(0, 0, 0), new Vector3(0, 0, L)];
   }
 }
 
@@ -70,4 +72,34 @@ export function buildCurve(points: Vector3[]): CatmullRomCurve3 {
  */
 export function exitDirection(curve: CatmullRomCurve3): Vector3 {
   return curve.getTangent(1).normalize();
+}
+
+/**
+ * Computes the world-space position and orientation for an entity 
+ * placed inside a slide chunk.
+ */
+export function getEntityTransform(
+  curve: CatmullRomCurve3,
+  t: number,
+  lane: -1 | 0 | 1
+) {
+  const point = curve.getPointAt(t);
+  const tangent = curve.getTangentAt(t).normalize();
+  
+  const worldUp = new Vector3(0, 1, 0);
+  let right = new Vector3().crossVectors(worldUp, tangent).normalize();
+  if (right.lengthSq() < 0.001) right.set(1, 0, 0);
+  const localUp = new Vector3().crossVectors(tangent, right).normalize();
+
+  const position = point
+    .clone()
+    .addScaledVector(right, lane * ENTITY.LANE_WIDTH)
+    .addScaledVector(localUp, 0.6); 
+
+  // Calculate rotation so the entity aligns with the slide's flow
+  const lookAtPoint = position.clone().add(tangent);
+  const matrix = new Matrix4().lookAt(position, lookAtPoint, localUp);
+  const quaternion = new Quaternion().setFromRotationMatrix(matrix);
+
+  return { position, quaternion, right, localUp, tangent };
 }

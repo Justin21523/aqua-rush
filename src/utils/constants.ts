@@ -28,26 +28,28 @@ export const GAME = {
 
 export const SLIDE = {
   /** Radius of the slide tube cross-section. */
-  TUBE_RADIUS: 2.6,
+  TUBE_RADIUS: 3.2, // Increased for better proportions
   /** Number of chunks to keep alive ahead of the player. */
-  LOOK_AHEAD_CHUNKS: 4,
+  LOOK_AHEAD_CHUNKS: 3, // Reduced for performance
   /** Number of chunks to keep behind the player before culling. */
-  LOOK_BEHIND_CHUNKS: 2,
+  LOOK_BEHIND_CHUNKS: 1, // Reduced for performance
   /** Approximate length of a single chunk in world units. */
-  CHUNK_LENGTH: 40,
-  /** Tubular segments used by THREE.TubeGeometry per chunk. */
-  TUBE_TUBULAR_SEGMENTS: 64,
+  CHUNK_LENGTH: 50, // Increased for smoother curves
+  /** Tubular segments used per chunk. */
+  TUBE_TUBULAR_SEGMENTS: 36, // Reduced from 64 for performance
   /** Radial segments of the tube cross-section. */
-  TUBE_RADIAL_SEGMENTS: 24,
+  TUBE_RADIAL_SEGMENTS: 10, // Reduced for performance
   /** Palette of bright "water park" colors used for chunks. */
   PALETTE: [
-    '#ff5e8a', // hot pink
-    '#ffae00', // tangerine
-    '#1ad1f2', // aqua
-    '#7cffb2', // mint
-    '#b181ff', // lavender
-    '#ffd166', // sunflower
+    '#ff5e8a',
+    '#ffae00',
+    '#1ad1f2',
+    '#7cffb2',
+    '#b181ff',
+    '#ffd166',
   ],
+  /** Length of a special Fork chunk. */
+  FORK_CHUNK_LENGTH: 70,
 } as const;
 
 export const PLAYER = {
@@ -69,3 +71,39 @@ export const CAMERA = {
   /** Smoothing factor for rotation / lookAt interpolation. */
   ROTATION_SMOOTH: 8,
 } as const;
+
+export const ENTITY = {
+  /** Radius of the coin bounding sphere. */
+  COIN_RADIUS: 0.45,
+  /** Radius of the obstacle bounding sphere. */
+  OBSTACLE_RADIUS: 0.8,
+  /** Radius of the booster bounding sphere. */
+  BOOSTER_RADIUS: 1.2,
+  
+  /** 
+   * Multiplier for collision checks. 
+   * A value < 1 makes collisions more forgiving (better for game feel).
+   */
+  FORGIVENESS: 0.85, 
+  
+  /** How far left/right entities can spawn from the center. */
+  LANE_WIDTH: 1.6,
+  
+  /** Duration of the speed boost in milliseconds. */
+  BOOST_DURATION_MS: 2500,
+} as const;
+
+export const DIFFICULTY = {
+  /** How much speed increases per second. */
+  SPEED_RAMP: 0.15,
+  /** Maximum speed cap. */
+  MAX_SPEED: 45,
+  /** Base chance to spawn an obstacle (0 to 1). */
+  BASE_OBSTACLE_CHANCE: 0.15,
+  /** How much obstacle chance increases per chunk. */
+  OBSTACLE_RAMP: 0.005,
+  /** Max obstacle chance cap. */
+  MAX_OBSTACLE_CHANCE: 0.6,
+} as const;
+
+

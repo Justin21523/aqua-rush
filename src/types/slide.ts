@@ -1,4 +1,14 @@
-import type { Vector3 } from 'three';
+import type { Vector3, CatmullRomCurve3 } from 'three';
+
+export type SceneryType = 'tree' | 'tower' | 'bg-slide' | 'cloud' | 'mountain';
+
+export interface SceneryItem {
+  type: SceneryType;
+  position: Vector3;
+  scale: number;
+  rotationY: number;
+  colorHex: string;
+}
 
 /**
  * Every chunk of the waterslide has a "shape" that determines its geometry.
@@ -51,10 +61,22 @@ export interface SlideChunkData {
   exitDirection: Vector3;
   /** Ordered list of control points used to build the chunk's spline. */
   controlPoints: Vector3[];
+  /** 
+   * The pre-computed Three.js curve. 
+   * Storing it here avoids recalculating it every frame in the Player component.
+   */
+  curve: CatmullRomCurve3;
+  /** 
+   * The actual physical length of the curve in world units.
+   * Crucial for calculating uniform movement speed.
+   */
+  arcLength: number; 
   /** Entities placed inside this chunk. */
   entities: ChunkEntity[];
   /** Base color of the slide tube. */
   color: string;
   /** Length of the chunk in world units. */
   length: number;
+  /** Background scenery items generated alongside this chunk. */
+  scenery: SceneryItem[]; 
 }
