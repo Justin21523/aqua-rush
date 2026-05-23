@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0b1220;
+  color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utility: keep the canvas sharp on high-DPI screens without letting it scroll. */
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+@layer utilities {
+  .text-stroke {
+    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+  }
+}
