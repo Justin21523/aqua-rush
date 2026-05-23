@@ -3,6 +3,7 @@ import Game from '@/game/Game';
 import MainMenu from '@/ui/MainMenu';
 import GameOverMenu from '@/ui/GameOverMenu';
 import PauseMenu from '@/ui/PauseMenu';
+import DebugPanel from '@/ui/DebugPanel'; 
 import HUD from '@/ui/HUD';
 import { useGameStore, GamePhase } from '@/store/gameStore';
 
@@ -14,6 +15,7 @@ import { useGameStore, GamePhase } from '@/store/gameStore';
 export default function App() {
   const phase = useGameStore((s) => s.phase);
   const setPhase = useGameStore((s) => s.setPhase);
+  const toggleGodMode = useGameStore((s) => s.toggleGodMode);
 
   // Global Escape handler toggles pause while playing.
   useEffect(() => {
@@ -22,20 +24,32 @@ export default function App() {
         if (phase === GamePhase.Playing) setPhase(GamePhase.Paused);
         else if (phase === GamePhase.Paused) setPhase(GamePhase.Playing);
       }
+      // Toggle God Mode with 'G' or 'g'
+      if (e.key === 'g' || e.key === 'G') {
+        toggleGodMode();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, setPhase]);
+  }, [phase, setPhase, toggleGodMode]);
 
   return (
     <div className="relative h-full w-full">
-      {/* 3D world always rendered so assets stay warm between phases. */}
       <Game />
 
-      {/* Overlay UI, conditionally rendered based on phase. */}
       {phase === GamePhase.Menu && <MainMenu />}
-      {phase === GamePhase.Playing && <HUD />}
-      {phase === GamePhase.Paused && <PauseMenu />}
+      {phase === GamePhase.Playing && (
+        <>
+          <HUD />
+          <DebugPanel /> 
+        </>
+      )}
+      {phase === GamePhase.Paused && (
+        <>
+          <PauseMenu />
+          <DebugPanel /> {/* Keep debug panel visible when paused */}
+        </>
+      )}
       {phase === GamePhase.GameOver && <GameOverMenu />}
     </div>
   );
