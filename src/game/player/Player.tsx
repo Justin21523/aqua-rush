@@ -29,6 +29,7 @@ export default function Player() {
   const currentChunkIndex = useGameStore((s) => s.currentChunkIndex);
   const setCurrentChunkIndex = useGameStore((s) => s.setCurrentChunkIndex);
   const addDistance = useGameStore((s) => s.addDistance);
+  const setSpeed = useGameStore((s) => s.setSpeed);
   const setPlayerPosition = useGameStore((s) => s.setPlayerPosition);
   const setPlayerForward = useGameStore((s) => s.setPlayerForward);
 
@@ -76,6 +77,7 @@ export default function Player() {
     const currentSpeed = isBoosted 
       ? baseSpeed * GAME.BOOST_MULTIPLIER 
       : baseSpeed;
+    setSpeed(currentSpeed);
 
     // 2. Calculate forward movement
     const distanceMoved = currentSpeed * delta;

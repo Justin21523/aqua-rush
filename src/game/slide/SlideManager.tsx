@@ -12,7 +12,6 @@ import { SlideChunkData } from './SlideTypes';
  */
 export default function SlideManager() {
   const phase = useGameStore((s) => s.phase);
-  const currentChunkIndex = useGameStore((s) => s.currentChunkIndex);
   const setChunks = useGameStore((s) => s.setChunks);
   
   const generatorRef = useRef(new SlideGenerator());
@@ -37,6 +36,7 @@ export default function SlideManager() {
   useFrame(() => {
     if (phase !== GamePhase.Playing) return;
 
+    const currentChunkIndex = useGameStore.getState().currentChunkIndex;
     let changed = false;
 
     // 1. Cull chunks far behind the player

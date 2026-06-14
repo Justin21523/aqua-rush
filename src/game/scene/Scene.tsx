@@ -4,9 +4,8 @@ import FollowCamera from '../camera/FollowCamera';
 import CameraEffects from '../camera/CameraEffects';
 import SlideManager from '../slide/SlideManager';
 import SlideChunk from '../slide/SlideChunk';
-import WaterParkBackground from '../environment/WaterParkBackground';
 import { useGameStore } from '@/store/gameStore';
-import { Sky } from '@react-three/drei'; // NEW: Add a skybox
+import { Sky } from '@react-three/drei';
 import WaterSpray from '../effects/WaterSpray';
 import BackgroundManager from '../environment/BackgroundManager';
 
@@ -43,9 +42,6 @@ export default function Scene() {
         mieDirectionalG={0.8}
       />
 
-      {/* Background water park elements */}
-      <WaterParkBackground />
-      
       <SlideManager />
 
       {chunks.map((chunk) => (

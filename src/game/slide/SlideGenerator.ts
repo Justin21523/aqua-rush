@@ -2,7 +2,7 @@ import { Vector3, MathUtils } from 'three';
 import { ChunkShape, type SlideChunkData, type ChunkEntity, SceneryItem, SceneryType } from '@/types/slide';
 import { SLIDE, DIFFICULTY } from '@/utils/constants';
 import { pickRandom, shortId, chance } from '@/utils/math';
-import { buildCurve, controlPointsForShape, exitDirection } from '@/utils/curves';
+import { buildCurve, exitDirection } from '@/utils/curves';
 import type { CatmullRomCurve3 } from 'three';
 
 const SCENERY_COLORS = {
@@ -10,6 +10,11 @@ const SCENERY_COLORS = {
   slide: ['#ff6b9d', '#feca57', '#48dbfb', '#1dd1a1', '#b181ff', '#ff9ff3'],
   mountain: ['#7ba4c9', '#8cb4d4', '#85adc9', '#9bc0de', '#6e97b8'],
 };
+
+interface SlideCandidate {
+  shape: ChunkShape;
+  localPoints: Vector3[];
+}
 
 /**
  * Procedural slide generator (Phase 1: stub).
@@ -32,8 +37,14 @@ export class SlideGenerator {
   /** Current yaw angle relative to +Z axis (radians). 0 = straight ahead. */
   private currentYaw = 0;
 
-  /** Maximum allowed yaw deviation from main direction. */
-  private readonly MAX_YAW = MathUtils.degToRad(35);
+  /** Comfortable yaw range before the generator starts gently favoring recovery. */
+  private readonly SOFT_YAW = MathUtils.degToRad(42);
+
+  /** Absolute yaw range before the generator rejects turns that keep drifting away. */
+  private readonly HARD_YAW = MathUtils.degToRad(72);
+
+  /** Largest accepted direction change between neighboring chunks. */
+  private readonly MAX_TURN_PER_CHUNK = MathUtils.degToRad(24);
 
   /** Reset the generator to the world origin for a new run. */
   reset() {
@@ -41,15 +52,16 @@ export class SlideGenerator {
     this.cursorDirection.set(0, 0, 1);
     this.nextIndex = 0;
     this.chunks = [];
+    this.currentYaw = 0;
   }
 
   /** Generate one chunk and advance the cursor. */
   generateNext(): SlideChunkData {
-    const shape = this.pickShapeWithDriftControl();
+    const candidate = this.pickCandidateWithDriftControl();
+    const { shape } = candidate;
 
-    const localPoints = controlPointsForShape(shape);
     // Transform local control points into world space using the cursor.
-    const worldPoints = localPoints.map((p) =>
+    const worldPoints = candidate.localPoints.map((p) =>
       this.transformToWorld(p),
     );
 
@@ -89,52 +101,122 @@ export class SlideGenerator {
    * When the slide has yawed too far in one direction, we bias toward
    * shapes that turn it back toward the main forward direction (+Z).
    */
-  private pickShapeWithDriftControl(): ChunkShape {
-    // Base weights
-    let wStraight = 0.45;
-    let wCurveLeft = 0.20;
-    let wCurveRight = 0.20;
-    let wSlopeDown = 0.10;
-    let wFork = 0.05;
-
-    // Calculate how far we've drifted (-1 to 1 normalized)
-    const driftRatio = MathUtils.clamp(this.currentYaw / this.MAX_YAW, -1, 1);
-
-    // Apply drift correction
-    if (driftRatio > 0.2) {
-      // Yawed to the RIGHT (positive) → bias LEFT turns to bring it back
-      const correction = driftRatio; // 0.2 to 1.0
-      wCurveRight *= (1 - correction * 0.8); // Strongly reduce right turns
-      wCurveLeft *= (1 + correction * 1.5);  // Boost left turns
-      wStraight *= (1 + correction * 0.5);   // Slightly boost straight
-    } else if (driftRatio < -0.2) {
-      // Yawed to the LEFT (negative) → bias RIGHT turns
-      const correction = -driftRatio;
-      wCurveLeft *= (1 - correction * 0.8);
-      wCurveRight *= (1 + correction * 1.5);
-      wStraight *= (1 + correction * 0.5);
+  private pickCandidateWithDriftControl(): SlideCandidate {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = this.pickWeightedCandidate();
+      if (this.isStableExit(candidate.localPoints)) return candidate;
     }
 
-    // Emergency correction: if we're near max yaw, almost force a correction
-    if (Math.abs(driftRatio) > 0.85) {
-      if (driftRatio > 0) {
-        wCurveLeft *= 3;
-        wCurveRight *= 0.1;
-      } else {
-        wCurveRight *= 3;
-        wCurveLeft *= 0.1;
+    return this.makeRecoveryCandidate();
+  }
+
+  /**
+   * Weighted candidate picker. Curves use a continuous random turn angle
+   * instead of a single fixed template, so the slide keeps changing direction.
+   */
+  private pickWeightedCandidate(): SlideCandidate {
+    const roll = Math.random();
+    const recoveryPressure = MathUtils.clamp(
+      (Math.abs(this.currentYaw) - this.SOFT_YAW) / (this.HARD_YAW - this.SOFT_YAW),
+      0,
+      1
+    );
+
+    let shape = ChunkShape.Straight;
+    let turn = this.randomTurn(recoveryPressure);
+
+    if (roll < 0.12) {
+      shape = ChunkShape.Straight;
+      turn = MathUtils.clamp(turn * 0.25, -MathUtils.degToRad(5), MathUtils.degToRad(5));
+    } else if (roll < 0.78) {
+      const minCurve = MathUtils.degToRad(8);
+      if (Math.abs(turn) < minCurve) {
+        turn = (turn < 0 ? -1 : 1) * minCurve;
       }
+      shape = turn < 0 ? ChunkShape.CurveLeft : ChunkShape.CurveRight;
+    } else if (roll < 0.92) {
+      shape = ChunkShape.SlopeDown;
+      turn = MathUtils.clamp(turn * 0.55, -MathUtils.degToRad(12), MathUtils.degToRad(12));
+    } else {
+      shape = ChunkShape.Fork;
+      turn = MathUtils.clamp(turn * 0.45, -MathUtils.degToRad(10), MathUtils.degToRad(10));
     }
 
-    // Weighted random selection
-    const total = wStraight + wCurveLeft + wCurveRight + wSlopeDown + wFork;
-    let roll = Math.random() * total;
+    return {
+      shape,
+      localPoints: this.controlPointsForTurn(shape, turn),
+    };
+  }
 
-    if ((roll -= wStraight) <= 0) return ChunkShape.Straight;
-    if ((roll -= wCurveLeft) <= 0) return ChunkShape.CurveLeft;
-    if ((roll -= wCurveRight) <= 0) return ChunkShape.CurveRight;
-    if ((roll -= wSlopeDown) <= 0) return ChunkShape.SlopeDown;
-    return ChunkShape.Fork;
+  private randomTurn(recoveryPressure: number): number {
+    const randomWander = (Math.random() - Math.random()) * this.MAX_TURN_PER_CHUNK;
+    const recoveryTurn = -Math.sign(this.currentYaw) * recoveryPressure * this.MAX_TURN_PER_CHUNK * 0.85;
+    return MathUtils.clamp(
+      randomWander + recoveryTurn,
+      -this.MAX_TURN_PER_CHUNK,
+      this.MAX_TURN_PER_CHUNK
+    );
+  }
+
+  private makeRecoveryCandidate(): SlideCandidate {
+    const turn = MathUtils.clamp(
+      -this.currentYaw * 0.35,
+      -this.MAX_TURN_PER_CHUNK,
+      this.MAX_TURN_PER_CHUNK
+    );
+    const shape = turn < 0 ? ChunkShape.CurveLeft : ChunkShape.CurveRight;
+
+    return {
+      shape,
+      localPoints: this.controlPointsForTurn(shape, turn),
+    };
+  }
+
+  private controlPointsForTurn(shape: ChunkShape, turn: number): Vector3[] {
+    const length = shape === ChunkShape.Fork ? SLIDE.FORK_CHUNK_LENGTH : SLIDE.CHUNK_LENGTH;
+    const drop =
+      shape === ChunkShape.SlopeDown ? 8 :
+      shape === ChunkShape.Fork ? 2.5 :
+      shape === ChunkShape.Straight ? 1.2 :
+      3.2;
+
+    const segmentLength = length / 3;
+    const segmentDrop = drop / 3;
+    const points = [new Vector3(0, 0, 0)];
+    const cursor = new Vector3();
+
+    for (let i = 1; i <= 3; i++) {
+      const yaw = turn * (i / 3);
+      cursor.add(new Vector3(
+        Math.sin(yaw) * segmentLength,
+        -segmentDrop,
+        Math.cos(yaw) * segmentLength
+      ));
+      points.push(cursor.clone());
+    }
+
+    return points;
+  }
+
+  private isStableExit(localPoints: Vector3[]): boolean {
+    const worldPoints = localPoints.map((p) => this.transformToWorld(p));
+    const curve = buildCurve(worldPoints);
+    const exit = exitDirection(curve);
+    const predictedYaw = Math.atan2(exit.x, exit.z);
+    const yawDelta = MathUtils.euclideanModulo(
+      predictedYaw - this.currentYaw + Math.PI,
+      Math.PI * 2
+    ) - Math.PI;
+
+    return (
+      Math.abs(predictedYaw) <= this.HARD_YAW &&
+      exit.z > 0.3 &&
+      Math.abs(yawDelta) <= this.MAX_TURN_PER_CHUNK + MathUtils.degToRad(4) &&
+      !(
+        Math.abs(this.currentYaw) > this.SOFT_YAW &&
+        Math.abs(predictedYaw) > Math.abs(this.currentYaw) + MathUtils.degToRad(2)
+      )
+    );
   }
 
 
@@ -210,39 +292,41 @@ export class SlideGenerator {
 
     // Layer 1: Near (dense, small objects)
     this.spawnSceneryLayer(items, curve, worldUp, {
-      clusters: 8,
+      clusters: 9,
       distanceMin: 15,
       distanceMax: 45,
-      types: ['tree', 'tree', 'tree', 'tree', 'tower'],
+      types: ['tree', 'tree', 'tree', 'tower'],
       scaleMin: 1.0,
       scaleMax: 2.5,
       yBase: -8,
-      skipChance: 0.1,
+      skipChance: 0.05,
     });
 
     // Layer 2: Mid (medium density, thematic objects)
     this.spawnSceneryLayer(items, curve, worldUp, {
-      clusters: 5,
-      distanceMin: 55,
+      clusters: 7,
+      distanceMin: 45,
       distanceMax: 130,
-      types: ['tower', 'bg-slide', 'tree', 'tower', 'bg-slide'],
+      types: ['bg-slide', 'tower', 'bg-slide', 'tree', 'bg-slide'],
       scaleMin: 3.0,
       scaleMax: 6.0,
       yBase: -5,
-      skipChance: 0.15,
+      skipChance: 0.05,
     });
 
     // Layer 3: Far (sparse, massive objects)
     this.spawnSceneryLayer(items, curve, worldUp, {
-      clusters: 3,
-      distanceMin: 150,
+      clusters: 4,
+      distanceMin: 130,
       distanceMax: 280,
-      types: ['mountain', 'tower', 'mountain', 'bg-slide'],
+      types: ['mountain', 'bg-slide', 'mountain', 'tower', 'bg-slide'],
       scaleMin: 8.0,
       scaleMax: 16.0,
       yBase: -12,
-      skipChance: 0.2,
+      skipChance: 0.12,
     });
+
+    this.spawnBackgroundSlides(items, curve, worldUp);
 
     // Layer 4: Sky (clouds scattered high above)
     const cloudCount = 2 + Math.floor(Math.random() * 3);
@@ -269,6 +353,35 @@ export class SlideGenerator {
     }
 
     return items;
+  }
+
+  private spawnBackgroundSlides(
+    items: SceneryItem[],
+    curve: CatmullRomCurve3,
+    worldUp: Vector3
+  ) {
+    const count = 5 + Math.floor(Math.random() * 4);
+
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.35 + Math.random() * 0.3) / count;
+      const point = curve.getPointAt(Math.min(t, 0.98));
+      const tangent = curve.getTangentAt(Math.min(t, 0.98)).normalize();
+      let right = new Vector3().crossVectors(worldUp, tangent).normalize();
+      if (right.lengthSq() < 0.001) right.set(1, 0, 0);
+
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const distance = 55 + Math.random() * 155;
+      const pos = point.clone().addScaledVector(right, side * distance);
+      pos.y = -6 + Math.random() * 8;
+
+      items.push({
+        type: 'bg-slide',
+        position: pos,
+        scale: 4 + Math.random() * 7,
+        rotationY: Math.atan2(tangent.x, tangent.z) + (Math.random() - 0.5) * 0.45,
+        colorHex: pickRandom(SCENERY_COLORS.slide) || '#48dbfb',
+      });
+    }
   }
 
   
@@ -319,7 +432,9 @@ export class SlideGenerator {
           type,
           position: pos,
           scale,
-          rotationY: Math.random() * Math.PI * 2,
+          rotationY: type === 'bg-slide'
+            ? Math.atan2(tangent.x, tangent.z) + (Math.random() - 0.5) * 0.55
+            : Math.random() * Math.PI * 2,
           colorHex,
         });
       }

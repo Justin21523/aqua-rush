@@ -30,9 +30,9 @@ export const SLIDE = {
   /** Radius of the slide tube cross-section. */
   TUBE_RADIUS: 3.2, // Increased for better proportions
   /** Number of chunks to keep alive ahead of the player. */
-  LOOK_AHEAD_CHUNKS: 3, // Reduced for performance
+  LOOK_AHEAD_CHUNKS: 8,
   /** Number of chunks to keep behind the player before culling. */
-  LOOK_BEHIND_CHUNKS: 1, // Reduced for performance
+  LOOK_BEHIND_CHUNKS: 2,
   /** Approximate length of a single chunk in world units. */
   CHUNK_LENGTH: 50, // Increased for smoother curves
   /** Tubular segments used per chunk. */
@@ -105,5 +105,4 @@ export const DIFFICULTY = {
   /** Max obstacle chance cap. */
   MAX_OBSTACLE_CHANCE: 0.6,
 } as const;
-
 

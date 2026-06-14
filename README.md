@@ -7,6 +7,8 @@ game development.
 > waterslide. Collect coins, hit boosters, dodge obstacles, and choose
 > your path at every fork. How far can you go?
 
+![AquaRush Gameplay](./public/screenshot.png)
+
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) — build tool

@@ -25,7 +25,7 @@ export function controlPointsForShape(shape: ChunkShape): Vector3[] {
         new Vector3(0, 0, 0),
         new Vector3(-4, -1, L * 0.33),
         new Vector3(-8, -2, L * 0.66),
-        new Vector3(-6, -3, L),
+        new Vector3(-12, -3, L),
       ];
 
     case ChunkShape.CurveRight:
@@ -33,7 +33,7 @@ export function controlPointsForShape(shape: ChunkShape): Vector3[] {
         new Vector3(0, 0, 0),
         new Vector3(4, -1, L * 0.33),
         new Vector3(8, -2, L * 0.66),
-        new Vector3(6, -3, L),
+        new Vector3(12, -3, L),
       ];
 
     case ChunkShape.SlopeDown:
